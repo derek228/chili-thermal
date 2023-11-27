@@ -1,48 +1,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "ini-parse.h"
 
 #define MAX_LINE_LEN 1024
-#define FRAME_NUMBER 10
-#define CONNECTION_UNDEFINE	0
-#define CONNECTION_RJ45		1
-#define CONNECTION_RS485	2
-#define XMAX	80
-#define YMAX	62
-int parse_ini_file(const char* filename);
-char *frame_title[]={"FRAME1","FRAME2","FRAME3","FRAME4","FRAME5","FRAME6","FRAME7","FRAME8","FRAME9","FRAME10"};
-#define CONNECTIVITY_TITLE "CONNECTIVITY"
-#define FRAME_DISABLE		0
-#define FRAME_ENABLE		1
-#define FRAME_PARAMS_ERROR	2
-typedef struct {
-int status;
-int x;
-int y;
-int w;
-int h;
-int alarm_status;
-float over_temperature;
-float under_temperature;
-}tFrame_t;
 
-int ir8026_connectivity=CONNECTION_UNDEFINE;
-tFrame_t tFrame[FRAME_NUMBER]={0};
+//int parse_ini_file(const char* filename);
+static char *frame_title[]={"FRAME1","FRAME2","FRAME3","FRAME4","FRAME5","FRAME6","FRAME7","FRAME8","FRAME9","FRAME10"};
 
-void ir8026_set_connectivity(char *mode){
+static int ir8062_connectivity=CONNECTION_UNDEFINE;
+
+static tFrame_t tFrame[FRAME_NUMBER]={0};
+
+
+static void ir8062_set_connectivity(char *mode){
 	if (strcmp(mode,"RJ45")==0)
-		ir8026_connectivity=CONNECTION_RJ45;
+		ir8062_connectivity=CONNECTION_RJ45;
 	else if (strcmp(mode,"RS485")==0)
-		ir8026_connectivity=CONNECTION_RS485;
+		ir8062_connectivity=CONNECTION_RS485;
 	else {
-		ir8026_connectivity=CONNECTION_RJ45;
+		ir8062_connectivity=CONNECTION_RJ45;
 		printf("Error : Unknow connection mode %s. Use RJ45 as default\n", mode);
 	}
 }
-void ir8026_set_frame_params(int id, char *key, char *value)
+static void ir8062_set_frame_params(int id, char *key, char *value)
 {
 	int val=0;
-	printf("parse FRAME%d params\n",id+1);
 	if (tFrame[id].status==FRAME_PARAMS_ERROR)
 	{
 		printf("ERROR: Wrong Frame%d params, skip...(key=%s, vlaue=%s)\n", id+1, key,value);
@@ -101,48 +84,25 @@ void ir8026_set_frame_params(int id, char *key, char *value)
 		tFrame[id].under_temperature=atof(value);
 	}
 }
-int ir8026_ini_params(char *title, char *key, char *value) {
+static int ir8062_ini_params(char *title, char *key, char *value) {
 	int i=0;
 	if (strcmp(title,CONNECTIVITY_TITLE)==0) {
-		ir8026_set_connectivity(value);
+		ir8062_set_connectivity(value);
 	}
-	if (ir8026_connectivity==CONNECTION_RJ45) {
-		printf("RJ45 mode not support frame setting function\n");
+	if (ir8062_connectivity==CONNECTION_RJ45) {
+		//printf("RJ45 mode not support frame setting function\n");
+		return 1;
 	}
 	else {
 		while (i<FRAME_NUMBER) {
 			//printf("frame_title=%s, title =%s\n", frame_title[i], title);
 			if (strcmp(frame_title[i],title)==0) {
-				ir8026_set_frame_params(i,key,value);
+				ir8062_set_frame_params(i,key,value);
 			}
 			i++;
 		}
 	}
-	
-}
-
-void ir8026_params_print() {
-	int i=0;
-	while (i < FRAME_NUMBER) {
-		if (tFrame[i].status==FRAME_ENABLE)
-			printf("FRAME%d: X=%d, Y=%d, W=%d, H=%d, alarm %d, over=%f, under=%f\n", i, tFrame[i].x,tFrame[i].y,tFrame[i].w,tFrame[i].h,tFrame[i].alarm_status,tFrame[i].over_temperature,tFrame[i].under_temperature);
-		else if (tFrame[i].status==FRAME_PARAMS_ERROR)
-			printf("FRAME%d: Wrong ini file format\n",i);
-		else
-			printf("FRAME%d disable\n",i);
-		i++;
-	}
-}
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s filename.ini\n", argv[0]);
-        return 1;
-    }
-    if (!parse_ini_file(argv[1])) {
-        fprintf(stderr, "Error parsing file: %s\n", argv[1]);
-        return 1;
-    }
-    return 0;
+	return 0;
 }
 
 int parse_ini_file(const char* filename) {
@@ -153,11 +113,6 @@ int parse_ini_file(const char* filename) {
 
     char line[MAX_LINE_LEN];
     char current_section[MAX_LINE_LEN] = "";
-    int i=0;
-	while (i<FRAME_NUMBER) {
-		printf("%d : %s\n",i,frame_title[i]);
-		i++;
-	}
     while (fgets(line, MAX_LINE_LEN, file)) {
         // Remove leading and trailing whitespace
         char* trimmed_line = line;
@@ -186,13 +141,49 @@ int parse_ini_file(const char* filename) {
                 *equals_sign = '\0';
                 char* key = trimmed_line;
                 char* value = equals_sign + 1;
-		ir8026_ini_params(current_section,key,value);
+		ir8062_ini_params(current_section,key,value);
 
  //               printf("[%s] %s=%s\n", current_section, key, value);
             }
         }
     }
-	ir8026_params_print();
+	ir8062_params_print();
     fclose(file);
     return 1;
 }
+
+void ir8062_params_print() {
+	int i=0;
+	while (i < FRAME_NUMBER) {
+		if (tFrame[i].status==FRAME_ENABLE)
+			printf("FRAME%d: X=%d, Y=%d, W=%d, H=%d, alarm %d, over=%f, under=%f\n", i+1, tFrame[i].x,tFrame[i].y,tFrame[i].w,tFrame[i].h,tFrame[i].alarm_status,tFrame[i].over_temperature,tFrame[i].under_temperature);
+		else if (tFrame[i].status==FRAME_PARAMS_ERROR)
+			printf("FRAME%d: Wrong ini file format\n",i+1);
+		else
+			printf("FRAME%d disable\n",i+1);
+		i++;
+	}
+}
+
+int ir8062_get_connectivity() {
+	return ir8062_connectivity;
+}
+
+tFrame_t ir8062_get_frameinfo(int id) {
+	return tFrame[id];
+}
+
+#if INI_PARSE_DEBUG
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s filename.ini\n", argv[0]);
+        return 1;
+    }
+    if (!parse_ini_file(argv[1])) {
+        fprintf(stderr, "Error parsing file: %s\n", argv[1]);
+        return 1;
+    }
+    return 0;
+}
+#endif
+
