@@ -9,18 +9,28 @@
 static char *frame_title[]={"FRAME1","FRAME2","FRAME3","FRAME4","FRAME5","FRAME6","FRAME7","FRAME8","FRAME9","FRAME10"};
 
 static int ir8062_connectivity=CONNECTION_UNDEFINE;
-
+static int ir8062_http_post_data_format=HTTP_POST_DATA_UNDEFINE;
 static tFrame_t tFrame[FRAME_NUMBER]={0};
 
 
-static void ir8062_set_connectivity(char *mode){
-	if (strcmp(mode,"RJ45")==0)
-		ir8062_connectivity=CONNECTION_RJ45;
-	else if (strcmp(mode,"RS485")==0)
-		ir8062_connectivity=CONNECTION_RS485;
-	else {
-		ir8062_connectivity=CONNECTION_RJ45;
-		printf("Error : Unknow connection mode %s. Use RJ45 as default\n", mode);
+static void ir8062_set_connectivity(char *key, char *value){
+	if (strcmp(key,"MODE")==0){
+		if (strcmp(value,"RJ45")==0)
+			ir8062_connectivity=CONNECTION_RJ45;
+		else if (strcmp(value,"RS485")==0)
+			ir8062_connectivity=CONNECTION_RS485;
+		else {
+			ir8062_connectivity=CONNECTION_RJ45;
+			printf("Error : Unknow connection mode %s. Use RJ45 as default\n", value);
+		}
+	}
+	else if (strcmp(key,"DATA")==0) {
+		if (strcmp(value,"SIMPLE")==0) {
+			ir8062_http_post_data_format=HTTP_POST_SIMPLE_DATA;
+		}
+		else if (strcmp(value, "FULL")) {
+			ir8062_http_post_data_format=HTTP_POST_FULL_DATA;
+		}
 	}
 }
 static void ir8062_set_frame_params(int id, char *key, char *value)
@@ -86,8 +96,9 @@ static void ir8062_set_frame_params(int id, char *key, char *value)
 }
 static int ir8062_ini_params(char *title, char *key, char *value) {
 	int i=0;
+	printf("title=%s, key=%s, value=%s\n",title, key, value);
 	if (strcmp(title,CONNECTIVITY_TITLE)==0) {
-		ir8062_set_connectivity(value);
+		ir8062_set_connectivity(key, value);
 	}
 	if (ir8062_connectivity==CONNECTION_RJ45) {
 		//printf("RJ45 mode not support frame setting function\n");
@@ -167,6 +178,10 @@ void ir8062_params_print() {
 
 int ir8062_get_connectivity() {
 	return ir8062_connectivity;
+}
+
+int ir8062_get_post_data_format() {
+	return ir8062_http_post_data_format;
 }
 
 tFrame_t ir8062_get_frameinfo(int id) {

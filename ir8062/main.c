@@ -48,8 +48,11 @@ static int ir8062_config_init()
 }
 
 int main(int argc, char *argv[]) {
-	ir8062_config_init();
 	int cnt=0;
+	pthread_t tid_sensor;
+	if (ir8062_config_init())
+		return -1;
+
 	switch (ir8062_get_connectivity()) {
 		case CONNECTION_RJ45:
 			printf("Thermal sensor output data to RJ45\n");
@@ -62,14 +65,21 @@ int main(int argc, char *argv[]) {
 				else 
 					break;
 			}
-			sensor_init(argc,argv);
+			// initial cloud service here
+			if (ir8062_cloud_service_init(argc,argv)) {
+				printf("ERROR : CURL initial failed...\n");
+				return -1;
+			}
+			//
 			break;
 		case CONNECTION_RS485:
 			printf("Thermal sensor output data to RS485\n");
+			// TODO: Initial UART8 here
 			break;
 		default :
 			printf("Error: Unknow output device\n");
 			break;
 	}
+	sensor_init(argc,argv);
 }
 

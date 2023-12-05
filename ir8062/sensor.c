@@ -16,6 +16,9 @@
 #include <stdint.h>
 #include "curl_fun.h"
 #include <curl/curl.h>
+#include "cloud-service.h"
+#include "ini-parse.h"
+#include "sensor.h"
 
 // Thermal sensor hardware signal setting
 #define CAP_SIG_ID          0x0a 
@@ -25,19 +28,21 @@
 #define CAP_MAX_LEN                 (CAP_MAX_LINE * CAP_INFO_LEN_UNIT_BYTE)
 #define GPIO_INFO_SIZE_INT          3
 #define CAP_MAX_LEN_INT             (CAP_MAX_LEN/4)
-#define ETHERNET_DEVICE_NAME		"eth0"
 // sensor data length
 #define RAW_DATA_LEN	9920 // 80x62x2
 #define THERMAL_STRING_LEN	29760  // 80x62x2x3 ( 3 char per 1 byte)
 
 char thermeal_image_1B_raw[ RAW_DATA_LEN ]; //80*62 pixel , 1 pixel = 2byte , spi odd=dummy even=real data
+#if 0
 char thermal_data_string[THERMAL_STRING_LEN]={0};
+#endif
 
 //gpio
 int state_change = 0;
+#if 0
 // global mac address 
 char device_macno[18]={0};
-
+#endif
 
 // SPI interface config
 static const char *device = "/dev/spidev1.0";
@@ -52,7 +57,9 @@ static int fd_capture;
 static uint8_t *tx;
 static uint8_t *rx;
 static int size;
-
+static char full_frame_max_temperature[2]={0};
+static char full_frame_min_temperature[2]={0};
+#if 0
 void get_macno() {
     int fd;
     struct ifreq ifr;
@@ -81,7 +88,6 @@ void get_macno() {
 	printf("Onboard MAC Address : %s\n", device_macno);
     
 }
-
 
 static void print_usage(const char *prog)
 {
@@ -117,7 +123,7 @@ static void parse_opts(int argc, char *argv[])
 		}
 	}
 }
-
+#endif
 
 void sig_event_handler(int sig_id, siginfo_t *sig_info, void *unused)
 {
@@ -183,7 +189,7 @@ static int memory_print() {
     return 0;
 }
 
-int ir8062_hwinit()
+static int ir8062_hwinit()
 {
 	//SPI
 	int ret = 0;
@@ -255,7 +261,7 @@ int ir8062_hwinit()
 	rx = malloc(size);
 	for (i=0; i<size; i++)
 	{
-		tx[i] = i;
+		tx[i] = 0;//i;
 		//printf("%x ", tx[i] );
 	}
 
@@ -265,6 +271,16 @@ int ir8062_hwinit()
 	system("./i2cset -f -y 1 0x40 0xD0 0x03");
 
 	system("./i2cset -f -y 1 0x40 0xB1 0x03");
+#if 1
+	system("./i2cget -f -y 1 0x40 0xB2");
+	system("./i2cget -f -y 1 0x40 0xB3");
+	system("./i2cget -f -y 1 0x40 0xE0");
+	system("./i2cget -f -y 1 0x40 0xE1");
+	system("./i2cget -f -y 1 0x40 0xE2");
+	system("./i2cget -f -y 1 0x40 0xE3");
+	system("./i2cget -f -y 1 0x40 0xE4");
+	system("./i2cget -f -y 1 0x40 0xE5");
+#else	
 	system("./i2cset -f -y 1 0x40 0xB2");
 	system("./i2cget -f -y 1 0x40");
 	system("./i2cset -f -y 1 0x40 0xB3");
@@ -285,9 +301,96 @@ int ir8062_hwinit()
 
 	system("./i2cset -f -y 1 0x40 0xE5");
 	system("./i2cget -f -y 1 0x40");
-
+#endif
 
 }
+
+static void ir8062_send_data(char *data)
+{
+	//printf("%s :DATA = %s, len=%ld\n",__FUNCTION__,data,strlen(data));
+	switch (ir8062_get_connectivity()) {
+		case CONNECTION_RJ45:
+			printf("Upload thermal sensor data to cloud\n");
+			ir8062_cloud_service_post(data);
+			break;
+		case CONNECTION_RS485:
+			printf("Upload thermal sensor data to RS485\n");
+			// TODO: Initial UART8 here
+			break;
+		default :
+			printf("Error: Unknow output device\n");
+			break;
+	}
+}
+//static show_thermal_header(uint8_t *buf) {
+static thermal_header_parse(int index, uint8_t *buf) {
+	#if 1
+		switch (index) {
+		case 0:
+			printf("Frame counter : %02X",buf[index]);
+			break;
+		case 1:
+			printf("%02X\n",buf[index]);
+			break;
+		case 2:
+			printf("SenXor VDD : %02X",buf[index]);
+			break;
+		case 3:
+			printf("%02X\n",buf[index]);
+			break;
+		case 4:
+			printf("Die Temperature : %02X",buf[index]);
+			break;
+		case 5:
+			printf("%02X\n",buf[index]);
+			break;
+		case 10:
+			printf("Max : %02X",buf[index]);
+			full_frame_max_temperature[0]=buf[index];
+			break;
+		case 11:
+			full_frame_max_temperature[1]=buf[index];
+			printf("%02X\n",buf[index]);
+			break;
+		case 12:
+			full_frame_min_temperature[0]=buf[index];
+			printf("Min : %02X",buf[index]);
+			break;
+		case 13:
+			full_frame_min_temperature[1]=buf[index];
+			printf("%02X\n",buf[index]);
+			break;
+
+		}
+
+	#else
+	printf("Frame counter=%2X%2X\n",buf[0],buf[1]);
+	printf("SenXor VDD=%2X%2x\n",buf[2],buf[3]);
+	printf("Die temperature=%2X%2X\n",buf[4],buf[5]);
+	printf("Time stamp=%2X%2X%2X%2X\n",buf[6],buf[7],buf[8],buf[9]);
+	printf("Max=%2X%2X\n",buf[10],buf[11]);
+	printf("Min=%2X%2X\n",buf[12],buf[13]);
+	#endif
+}
+static int show_thermal_raw(char *raw) {
+	int i,j;
+	printf("=============== Show thermal sensor RAW data ===============\n");
+	for (i=0; i<62; i++) {
+		for (j=0; j<40;j++) {
+			printf("%02X%02X ",thermeal_image_1B_raw[i*80+j*2],thermeal_image_1B_raw[i*80+j*2+1]);
+		}
+		printf("\n");
+	}
+	printf("\n=============== Thermal sensor RAW data END ===============\n");
+}
+char* get_full_frame_max_temperature() {
+	return full_frame_max_temperature;
+}
+
+char* get_full_frame_min_temperature() {
+	return full_frame_min_temperature;
+}
+
 int sensor_init(int argc, char *argv[])
 //int main(int argc, char *argv[])
 {
@@ -299,113 +402,102 @@ int sensor_init(int argc, char *argv[])
 	static uint16_t remove_front_count = 0;
 	//static uint8_t remove_flag = 1;
 	//static uint16_t remove_number = 160;
-
-#ifdef SAVE_RAW_FILE
-	// Save image
-	int image_index = 0;
-	char image_name[] 	  = "./programs";
-	char image_index_number[] = ".raw";	
-	int len = strlen(image_name) + strlen(image_index_number) + 3;
-	char concated[len];
-	memset(concated, '\0', len);
-	FILE *fptr;
-	char text[23];
-#endif
-	ret=ir8062_hwinit();
-	curl_global_init(CURL_GLOBAL_DEFAULT);
-	get_macno();
-	parse_opts(argc, argv);
-	set_gateway_url(device_macno);
-
-	if (curl_exec_ir_gateway()	<0) {
-	  	printf("HTTP ERROR : can't get sensor_id\n");
-		return ret;
+	char key_val;
+	ssize_t inputbyte;
+	int key_flags=fcntl(STDIN_FILENO,F_GETFL,0);
+	if (key_flags == -1) {
+		printf ("ERROR : fcntl failed.\n");
+		exit(EXIT_FAILURE);
 	}
+	fcntl(STDIN_FILENO,F_SETFL, key_flags | O_NONBLOCK);
+	ret=ir8062_hwinit();
 
 	while(1) 
 	{
 		fflush(0);
 		if (state_change == 1) 
 		{
+			//printf("===== spi read start\n");
+			//system("./i2cdump -f -y 1 0x40");
 			state_change = 0;
-
-				for(spi_count = 0; spi_count<100; spi_count++)			//101 -> 80*62*2 / 99
+			for(spi_count = 0; spi_count<100; spi_count++)			//101 -> 80*62*2 / 99
+			{
+				transfer(fd_spi, tx, rx, size);
+				// ----------------------Build RAW array----------------------			
+				for (i = 0; i < size; i++)
 				{
-
-
-						transfer(fd_spi, tx, rx, size);
-
-						// ----------------------Build RAW array----------------------			
-						for (i = 0; i < size; i++)
-						{
-							if(remove_front_count >= 160){
-								//printf("Remove header, start record tempature\n");
-								thermeal_image_1B_raw[index] = rx[i]; 
-								index = index +1 ;
-							}
-							//else
-								//printf("thermal data[%d]=0x%x\n", index, thermeal_image_1B_raw[i]);
-							count_break++;		// count for image
-							remove_front_count++; 	// count for remove image header
+					if(remove_front_count >= 160){
+						//printf("Remove header, start record tempature\n");
+						thermeal_image_1B_raw[index] = rx[i]; 
+						index = index +1 ;
+					}
+					else{
+						thermal_header_parse(i,rx);
+						//printf("thermal data[%d]=0x%x\n", i, rx[i]);
+					}
+					count_break++;		// count for image
+					remove_front_count++; 	// count for remove image header
+				}
+				//printf("thermal data[%d]=0x%x\n", index, thermeal_image_1B_raw[index]);
+//				if (remove_front_count<=160) {
+//					show_thermal_header(rx);
+//					//printf("remove count = %d\n",remove_front_count);
+//				}
+				if ( count_break == 9920 + 160 )  // [80x62x2 = 9920(1pixel 2byte)]  [9920x2 (1pixel 2byte [SPI 16bits])]  [+160 because header ]
+				{
+					//printf("Get 9920 + 160 byte\n");
+					count_break = 0; 
+					remove_front_count = 0;
+					index = 0;
+#if 0
+					// Conver Thermal raw data to string
+					memset(thermal_data_string,'\0',strlen(thermal_data_string));
+					sprintf(thermal_data_string , "%02X", thermeal_image_1B_raw[0]);
+					for (i=1; i < 9920; i++) {
+						if ( (i*3)>= THERMAL_STRING_LEN ) {
+							//printf("ERROR : over buffer length (%d)\n",i*3);
+							break; // over buffer length
 						}
-						//printf("thermal data[%d]=0x%x\n", index, thermeal_image_1B_raw[index]);
+						//printf("%d : ,%02X\n",i, thermeal_image_1B_raw[i]);
+						sprintf(thermal_data_string + (i * 3)-1, ",%02X", thermeal_image_1B_raw[i]);
+					}
+					//printf("Output string : %s\n",thermal_data_string);
+					// end Thermal raw data string
 
-						if ( count_break == 9920 + 160 )  // [80x62x2 = 9920(1pixel 2byte)]  [9920x2 (1pixel 2byte [SPI 16bits])]  [+160 because header ]
-						{
-
-//							printf("Get 9920 + 160 byte\n");
-							count_break = 0; 
-							remove_front_count = 0;
-							index = 0;
-//							char test_data[]="1,2,3,4,5,6";
-//							curl_fun(test_data);
-							
-							
-							memset(thermal_data_string,'\0',strlen(thermal_data_string));
-							sprintf(thermal_data_string , "%02X", thermeal_image_1B_raw[0]);
-							for (i=1; i < 9920; i++) {
-									if ( (i*3)>= THERMAL_STRING_LEN ) {
-										//printf("ERROR : over buffer length (%d)\n",i*3);
-										break; // over buffer length
-									}
-									//printf("%d : ,%02X\n",i, thermeal_image_1B_raw[i]);
-									sprintf(thermal_data_string + (i * 3)-1, ",%02X", thermeal_image_1B_raw[i]);
-							}
-							//printf("Output string : %s\n",thermal_data_string);
-							
-							
-							
-							
-							curl_fun(thermal_data_string);
-#ifdef SAVE_RAW_FILE														
-							strcat(concated, image_name);
-							sprintf(text, "%d", image_index);   
-							strcat(concated, text);
-							strcat(concated, image_index_number);
-							printf("%s \n",concated);
-							image_index = image_index + 1;
-
-							if ((fptr = fopen(concated,"wb")) == NULL){
-								printf("Error! opening file\n ");
-								exit(1);
-							}
-
-							fwrite(&thermeal_image_1B_raw, sizeof(thermeal_image_1B_raw), 1, fptr); 
-							memset(concated, '\0', len);
-							
-							fclose(fptr); 
+					curl_fun(thermal_data_string);
+#else				
+					//printf("%s :DATA = %s, len=%ld\n",__FUNCTION__,thermeal_image_1B_raw,strlen(thermeal_image_1B_raw));
+					ir8062_send_data(thermeal_image_1B_raw);
 #endif
-							printf("OK : size=%ld Byte\n ",sizeof(thermeal_image_1B_raw) );
-							break;
-						}
-				} // end spi_count 
-				//printf("spi_count=%d\n",spi_count);
-				memory_print();
+					//printf("OK : size=%ld Byte\n ",sizeof(thermeal_image_1B_raw) );
+					//show_thermal_raw(thermeal_image_1B_raw);
+					break;
+				}
+			} // end spi_count 
+			//printf("spi_count=%d\n",spi_count);
+			//printf("spi read stop =================\n");
+			//system("./i2cdump -f -y 1 0x40");
+			//system("./i2cget -f -y 1 0x40 0xB6");
+			memory_print();
 		}
+		inputbyte = read(STDIN_FILENO,&key_val,1);
+		if (inputbyte > 0) {
+			printf("INPUT Value = 0x%x, bytes=%d\n", key_val, inputbyte);
+			if (key_val == 0xa) {// enter
+				sleep(1);
+				//system("./i2cget -f -y 1 0x40 0xB6");
+				break;
+			}
+		}
+		else 
+			printf("No keyboard input. %d\n", inputbyte);
 	}
 	printf("Exit SPIRW\n");
-  curl_global_cleanup();
-
+#if 0	
+	curl_global_cleanup();
+#else
+	ir8062_cloud_service_release();
+#endif
 
 
 	free(rx);

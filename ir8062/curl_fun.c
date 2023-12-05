@@ -85,8 +85,8 @@ int curl_exec_ir_gateway() {
   CURLcode res;
   curl = curl_easy_init();
   if(curl) {
-  	printf("URL = %s, len=%d\n", IGREENT_IR_GATEWAY_URL, strlen(IGREENT_IR_GATEWAY_URL));
-  	printf("url = %s, len=%d\n", igreent_ir_gateway_url_prefix, strlen(igreent_ir_gateway_url_prefix));
+  	printf("URL TEST = %s, len=%d\n", IGREENT_IR_GATEWAY_URL, strlen(IGREENT_IR_GATEWAY_URL));
+  	printf("url REAL = %s, len=%d\n", igreent_ir_gateway_url_prefix, strlen(igreent_ir_gateway_url_prefix));
     curl_easy_setopt(curl, CURLOPT_URL, igreent_ir_gateway_url_prefix);
 
     /* send all data to this function  */

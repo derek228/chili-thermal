@@ -6,7 +6,7 @@ TARGET = ir8062
 
 #SRCS := ini-parser.c main.c
 #OBJS= main.o cJSON.o curl_fun.o sensor.o cJSON.o
-OBJS= main.o cJSON.o curl_fun.o sensor.o ini-parse.o
+OBJS= main.o cJSON.o sensor.o ini-parse.o cloud-service.o http-igreent.o
 LIBS = -lcurl -lm #-lssl -lcrypto #-ljson-c -lnsl 
 
 $(TARGET) : $(OBJS)
