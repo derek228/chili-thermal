@@ -18,19 +18,20 @@
 #define ETHERNET_DEVICE_NAME		"eth0"
 
 typedef struct {
-int status;
-int x;
-int y;
-int w;
-int h;
-int alarm_status;
-float over_temperature;
-float under_temperature;
+	int status;
+	int x;
+	int y;
+	int w;
+	int h;
+	int alarm_status;
+	float over_temperature;
+	float under_temperature;
 }tFrame_t;
 
 tFrame_t ir8062_get_frameinfo(int id);
 void ir8062_params_print();
 int ir8062_get_connectivity();
 int parse_ini_file(const char* filename);
-int ir8062_get_post_data_format();
+//int ir8062_get_post_data_format();
+//tEthernet_t get_eth_config();
 #endif

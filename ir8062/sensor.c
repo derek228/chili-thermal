@@ -489,8 +489,8 @@ int sensor_init(int argc, char *argv[])
 				break;
 			}
 		}
-		else 
-			printf("No keyboard input. %d\n", inputbyte);
+//		else 
+//			printf("No keyboard input. %d\n", inputbyte);
 	}
 	printf("Exit SPIRW\n");
 #if 0	
