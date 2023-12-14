@@ -44,6 +44,7 @@ class EthernetConfig:
         self.alarm=None
         self.over_temperature=None
         self.under_temperature=None
+        self.alert_temperature=None
     def set_serial(self,port):
         self.com_port=port
     def set_transfer_format(self,format):
@@ -54,3 +55,5 @@ class EthernetConfig:
         self.over_temperature=over
     def set_under_temperature(self,under):
         self.under_temperature=under
+    def set_alert_temperature(self,alert):
+        self.alert_temperature=alert

@@ -77,7 +77,8 @@ def save_settings():
     	'DATA':eth.transfer_format,
         'ALARM':eth.alarm,
         'OVER_TEMPERATURE':eth.over_temperature,
-        'UNDER_TEMPERATURE':eth.under_temperature
+        'UNDER_TEMPERATURE':eth.under_temperature,
+        'ALERT_TEMPERATURE':eth.alert_temperature
     	}
     with open('ethernet.ini', 'a') as configfile:
         config.write(configfile)
@@ -124,6 +125,13 @@ def under_temperature_on_leave(event) :
     else:
         #messagebox.showinfo("Warning", f"Under Temperature is: {under}")
         eth.set_under_temperature(under)
+def alert_temperature_on_leave(event) :
+    alert=rj45_alert_temperature_entry.get()
+    if not alert.isdigit():
+        messagebox.showwarning("Warning", "Please input digital number")
+    else:
+        #messagebox.showinfo("Warning", f"Under Temperature is: {under}")
+        eth.set_alert_temperature(alert)
 
 eth=ir8062_config.EthernetConfig()
 serial_ports = scan_serial_ports()
@@ -193,13 +201,19 @@ rj45_under_temperature_entry = tk.Entry(root)
 rj45_under_temperature_entry.grid(row=5,column=1)
 rj45_under_temperature_entry.bind("<FocusOut>", under_temperature_on_leave)
 
+rj45_alert_temperature_label = tk.Label(root, text="RJ45 Alert Temperature:")
+rj45_alert_temperature_label.grid(row=6,column=0,sticky=tk.W)
+rj45_alert_temperature_entry = tk.Entry(root)
+rj45_alert_temperature_entry.grid(row=6,column=1)
+rj45_alert_temperature_entry.bind("<FocusOut>", alert_temperature_on_leave)
+
 
 # 建立儲存按鈕
 save_button = tk.Button(root, text="Save Settings", command=save_settings)
 #save_button.grid(sticky=tk.S)#row=20,column=3)
 save_button.grid_forget()
 apply_button = tk.Button(root, text="Apply Settings", command=apply_settings)
-apply_button.grid(row=6,column=0)
+apply_button.grid(row=9,column=0)
 
 connect_button = tk.Button(root, text="Connect Device", command=connect_device)
 connect_button.grid(row=15,column=0)
