@@ -78,6 +78,19 @@ static void ir8062_set_connectivity(char *key, char *value){
 
 		//eth_config.under_temperature=val;
 	}
+	else if (strstr(key,"alert_temperature")!=NULL) {
+		if (value==NULL) {
+			printf("Alert Temperature is NULL\n");
+			val=-1;
+		}
+		else {
+			val = atoi(value);
+		}
+		set_eth_alert_temperature(val);
+		printf("Alert temperature = %s", value);
+
+		//eth_config.under_temperature=val;
+	}	
 }
 static void ir8062_set_frame_params(int id, char *key, char *value)
 {

@@ -1,8 +1,3 @@
-// 980
-
-/*
-   GPIO
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +15,6 @@
 #include <net/if.h>
 #include <stdint.h>
 #include "curl_fun.h"
-//#include <x86_64-linux-gnu/curl/curl.h>
 #include <curl/curl.h>
 
 #define CAP_SIG_ID          0x0a 
@@ -30,31 +24,14 @@
 #define CAP_INFO_LEN_UNIT_BYTE      12
 #define CAP_MAX_LEN                 (CAP_MAX_LINE * CAP_INFO_LEN_UNIT_BYTE)
 #define GPIO_INFO_SIZE_INT          3
-
 #define CAP_MAX_LEN_INT             (CAP_MAX_LEN/4)
 #define ETHERNET_DEVICE_NAME		"eth0"
-//#define SAVE_RAW_FILE	
-
-/*
- * SPI testing utility (using spidev driver)
- *
- * Copyright (c) 2007  MontaVista Software, Inc.
- * Copyright (c) 2007  Anton Vorontsov <avorontsov@ru.mvista.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License.
- *
- * Cross-compile with cross-gcc -I/path/to/cross-kernel/include
- */
 #define RAW_DATA_LEN	9920 // 80x62x2
 #define THERMAL_STRING_LEN	29760  // 80x62x2x3 ( 3 char per 1 byte)
-//#define THERMAL_STRING_LEN 80 // test
 
-//uint8_t thermeal_image_1B_raw[ RAW_DATA_LEN ]; //80*62 pixel , 1 pixel = 2byte , spi odd=dummy even=real data
 char thermeal_image_1B_raw[ RAW_DATA_LEN ]; //80*62 pixel , 1 pixel = 2byte , spi odd=dummy even=real data
-//char thermal_data_string[80*62*4]={0};
 char thermal_data_string[THERMAL_STRING_LEN]={0};
+
 //gpio
 int state_change = 0;
 char device_macno[17]={0};//"00:00:00:00:00:00";
@@ -101,20 +78,14 @@ static void parse_opts(int argc, char *argv[])
 	char *macno;
 	int i=0;
 	while (1) {
-//		printf("argc=%d, argv[%d]=%s\n",argc, i, argv[i]);
-		static const struct option lopts[] = {
-			{ "macno",  1, 0, 'm' },
-//			{ "ready",   0, 0, 'R' },
-			{ NULL, 0, 0, 0 },
-		};
 		int c;
-		c = getopt_long(argc, argv, "m:", lopts, NULL);
+		c = getopt(argc, argv, "m:");
 		if (c == -1) {
 			break;
 		}
 		switch (c) {
 			case 'm':
-				macno = optarg;
+				macno = optarg+1;
 				memcpy(device_macno, macno, strlen(macno));
 				printf("SPECIFICT MAC NO = %s, len=%d\n",macno,strlen(macno));
 				printf("Specific mac number=%s\n", device_macno);

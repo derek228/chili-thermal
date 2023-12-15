@@ -1,6 +1,12 @@
 #ifndef __INI_PARSE__
 #define __INI_PARSE__
 
+// debug message
+#define logd(  dbg, x, y... ) do{ \
+    if(dbg == 1 )\
+    printf( x"\r\n", ##y ); }while(0)
+
+
 #define FRAME_NUMBER 			10
 #define CONNECTION_UNDEFINE		0
 #define CONNECTION_RJ45			1
@@ -16,6 +22,7 @@
 #define FRAME_PARAMS_ERROR	2
 #define INI_PARSE_DEBUG		0
 #define ETHERNET_DEVICE_NAME		"eth0"
+
 
 typedef struct {
 	int status;

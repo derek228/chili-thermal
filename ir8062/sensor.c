@@ -32,6 +32,7 @@
 #define RAW_DATA_LEN	9920 // 80x62x2
 #define THERMAL_STRING_LEN	29760  // 80x62x2x3 ( 3 char per 1 byte)
 
+int sensor_debug = 0;
 char thermeal_image_1B_raw[ RAW_DATA_LEN ]; //80*62 pixel , 1 pixel = 2byte , spi odd=dummy even=real data
 #if 0
 char thermal_data_string[THERMAL_STRING_LEN]={0};
@@ -46,6 +47,8 @@ char device_macno[18]={0};
 
 // SPI interface config
 static const char *device = "/dev/spidev1.0";
+//static const char *device = "/dev/spidev0.1";
+//static const char *device = "/dev/spidev1.1";
 static uint32_t mode;
 static uint8_t bits = 8;
 static uint32_t speed = 4000000; //500000    4000000
@@ -185,7 +188,7 @@ static int memory_print() {
         }
     }
     fclose(fp);
-    printf("Free memory: %llu bytes\n", free_memory);
+    logd(sensor_debug,"Free memory: %llu bytes\n", free_memory);
     return 0;
 }
 
@@ -202,7 +205,7 @@ static int ir8062_hwinit()
 	act.sa_sigaction = sig_event_handler;
 	sigaction(CAP_SIG_ID, &act, NULL);
 
-	printf("signal handler= %d\n", CAP_SIG_ID);
+	printf("signal handler= %d, spi device=%s\n", CAP_SIG_ID,device);
 
 	fd_capture = open("/dev/gpio_cap", O_RDWR);
 	if(fd_capture < 0) {
@@ -310,11 +313,11 @@ static void ir8062_send_data(char *data)
 	//printf("%s :DATA = %s, len=%ld\n",__FUNCTION__,data,strlen(data));
 	switch (ir8062_get_connectivity()) {
 		case CONNECTION_RJ45:
-			printf("Upload thermal sensor data to cloud\n");
+			logd(sensor_debug,"Upload thermal sensor data to cloud\n");
 			ir8062_cloud_service_post(data);
 			break;
 		case CONNECTION_RS485:
-			printf("Upload thermal sensor data to RS485\n");
+			logd(sensor_debug,"Upload thermal sensor data to RS485\n");
 			// TODO: Initial UART8 here
 			break;
 		default :
@@ -327,38 +330,38 @@ static thermal_header_parse(int index, uint8_t *buf) {
 	#if 1
 		switch (index) {
 		case 0:
-			printf("Frame counter : %02X",buf[index]);
+			logd(sensor_debug,"Frame counter : %02X",buf[index]);
 			break;
 		case 1:
-			printf("%02X\n",buf[index]);
+			logd(sensor_debug,"%02X\n",buf[index]);
 			break;
 		case 2:
-			printf("SenXor VDD : %02X",buf[index]);
+			logd(sensor_debug,"SenXor VDD : %02X",buf[index]);
 			break;
 		case 3:
-			printf("%02X\n",buf[index]);
+			logd(sensor_debug,"%02X\n",buf[index]);
 			break;
 		case 4:
-			printf("Die Temperature : %02X",buf[index]);
+			logd(sensor_debug,"Die Temperature : %02X",buf[index]);
 			break;
 		case 5:
-			printf("%02X\n",buf[index]);
+			logd(sensor_debug,"%02X\n",buf[index]);
 			break;
 		case 10:
-			printf("Max : %02X",buf[index]);
+			logd(sensor_debug,"Max : %02X",buf[index]);
 			full_frame_max_temperature[0]=buf[index];
 			break;
 		case 11:
 			full_frame_max_temperature[1]=buf[index];
-			printf("%02X\n",buf[index]);
+			logd(sensor_debug,"%02X\n",buf[index]);
 			break;
 		case 12:
 			full_frame_min_temperature[0]=buf[index];
-			printf("Min : %02X",buf[index]);
+			logd(sensor_debug,"Min : %02X",buf[index]);
 			break;
 		case 13:
 			full_frame_min_temperature[1]=buf[index];
-			printf("%02X\n",buf[index]);
+			logd(sensor_debug,"%02X\n",buf[index]);
 			break;
 
 		}

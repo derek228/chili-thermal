@@ -19,6 +19,7 @@
 #include "cloud-service.h"
 #include "http-igreent.h"
 #include "ini-parse.h"
+#include "rs485.h"
 
 #define IGREENT_CLOUD 1
 // global mac address 
@@ -101,6 +102,13 @@ void set_eth_over_temperature(int temp) {
 void set_eth_under_temperature(int temp) {
 	eth_config.under_temperature = temp;
 }
+void set_eth_alert_temperature(int temp) {
+	eth_config.alert_temperature = temp;
+}
+int get_eth_alert_temerature() {
+	return eth_config.alert_temperature;
+}
+
 int get_eth_data_format() {
 	return eth_config.data_format;
 }
@@ -118,6 +126,7 @@ int ir8062_cloud_service_init(int argc, char *argv[]) {
 	curl_global_init(CURL_GLOBAL_DEFAULT);
 	get_macno();
 	parse_opts(argc, argv);
+	rs485_init();
 //	set_gateway_url(device_macno);
 
 //	if (curl_exec_ir_gateway()	<0) {

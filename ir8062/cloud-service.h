@@ -7,6 +7,7 @@ typedef struct {
 	int alarm_status;
 	int over_temperature;
 	int under_temperature;
+	int alert_temperature;
 }tEthernet_t;
 
 int ir8062_cloud_service_init(int argc, char *argv[]);

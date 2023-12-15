@@ -9,6 +9,7 @@
 #include "http-igreent.h"
 #include "ini-parse.h"
 #include "sensor.h"
+#include "rs485.h"
 
 #define IGREENT_POST_FRAME_URL "http://demo.igreent.com/php/insert_ir_arrary_post.php"
 #define IGREENT_IR_GATEWAY_URL "http://demo.igreent.com/php/exec_q_ir_gateway.php?macno=25:17:51:47:00:01"
@@ -19,10 +20,15 @@
 #define THERMAL_STRING_LEN  29760  // 80x62x2x3 ( 3 char per 1 byte)
 
 char thermal_data_string[THERMAL_STRING_LEN]={0};
-
+int igreent_debug=0;
 // derek parser arg for macno
 static char igreent_ir_gateway_url_prefix[128]="http://demo.igreent.com/php/exec_q_ir_gateway.php?macno="; // {0};
 static char SensorID[SENSOR_ID_LEN]={0};
+
+char RS485_DO1_OFF[8]={0x01,0x05,0x00,0x00,0x00,0x00,0xCD,0xCA};
+char RS485_DO1_ON[8]={0x01,0x05,0x00,0x00,0xFF,0x00,0x8C,0x3A};
+char RS485_DO2_OFF[8]={0x01,0x05,0x00,0x01,0x00,0x00,0x9C,0x0A};
+char RS485_DO2_ON[8]={0x01,0x05,0x00,0x01,0xFF,0x00,0xDD,0xFA};
 
 struct memory {
   char *response;
@@ -146,7 +152,59 @@ int curl_exec_ir_gateway() {
   }
 }
 
-
+static void set_alarm_dio(int index, int en) {
+  static int alarm_do1=0, alarm_do2=0;
+  int len=0;
+  char rx[8]={0};
+  if (index == 1) {
+    if (en && (alarm_do1==0)) {
+      printf("Send DO 1 On\n");
+      rs485_send(RS485_DO1_ON,8);
+      len  = rs485_read(rx,8);
+      if ((len !=8 ) || (memcmp(rx,RS485_DO1_ON,8)!=0))
+      {
+        printf("ERROR DO 1 on command fail\nlen = %d, data = %s",len, rx);
+      }
+      else
+        alarm_do1 = 1;
+    }
+    else if ( (en==0) && alarm_do1) { // off
+      printf("Send DO 1 Off\n");
+      rs485_send(RS485_DO1_OFF,8);
+      len  = rs485_read(rx,8);
+      if ((len !=8 ) || (memcmp(rx,RS485_DO1_OFF,8)!=0))
+      {
+        printf("ERROR DO 1 on command fail\nlen = %d, data = %s",len, rx);
+      }
+      else 
+        alarm_do1=0;
+    }
+  }
+  else if (index == 2) {
+    if (en && (alarm_do2==0)) {
+      printf("Send DO 2 On\n");
+      rs485_send(RS485_DO2_ON,8);
+      len  = rs485_read(rx,8);
+      if ((len !=8 ) || (memcmp(rx,RS485_DO2_ON,8)!=0) )
+      {
+        printf("ERROR DO 2 on command fail\nlen = %d, data = %s",len, rx);
+      }
+      else
+        alarm_do2 = 1;
+    }
+    else if ( (en==0) && alarm_do2) { // off
+      printf("Send DO 2 Off\n");
+      rs485_send(RS485_DO2_OFF,8);
+      len  = rs485_read(rx,8);
+      if ((len !=8 ) || (memcmp(rx,RS485_DO2_OFF,8)!=0))
+      {
+        printf("ERROR DO 2 on command fail\nlen = %d, data = %s",len, rx);
+      }
+      else 
+        alarm_do2=0;
+    }
+  }
+}
 static void convert_raw_to_string()
 {
   int i;
@@ -216,18 +274,34 @@ static int simple_data_post() {
   char max_temp_str[5]={0};
   char *max_temp=get_full_frame_max_temperature();
   unsigned int temp=(max_temp[0]<<8) | max_temp[1];
-  printf("Max temperature = %d\n",temp);
+  char rs485_test_cmd[32]={0};//"Normal Temperature";
+  logd(igreent_debug,"Max temperature = %d\n",temp);
+  printf("max = %d,alarm 1 temp = %d, alarm 2 temp = %d\n",temp, get_eth_over_temperature(),get_eth_alert_temerature());
   if (get_eth_over_temperature() > temp) {
-    printf("Normal temperature, return\n");
+    printf("Normal temperature, %d\n", (temp-2735)/10);
+    //sprintf(rs485_test_cmd,"Normal Temperature %d\n",temp-2735);
+    //rs485_send(rs485_test_cmd,32);
+    set_alarm_dio(1,0);
+    set_alarm_dio(2,0);
     return 0;
   }
+  else {
+    set_alarm_dio(1,1);
+  }
+  if (get_eth_alert_temerature() > temp ) {
+    set_alarm_dio(2,0);
+  }
+  else {
+    set_alarm_dio(2,1);
+  }
   sprintf(max_temp_str, "%02X,%02X", max_temp[0],max_temp[1]);
-  printf("MAX Temperature = %s\n", max_temp_str);
+  logd(igreent_debug,"MAX Temperature = %s\n", max_temp_str);
   cjson_ir_array = cJSON_CreateObject();
   cJSON_AddStringToObject(cjson_ir_array, "sensor_id", SensorID);
   cJSON_AddStringToObject(cjson_ir_array, "modbus_cmd","IG8062_01X01");
   cJSON_AddStringToObject(cjson_ir_array, "ir_value",max_temp_str);
   out = cJSON_Print(cjson_ir_array);
+  logd(igreent_debug,"Create ir_array_post data\n %s \n len=%ld   END\n",out,strlen(out));
   printf("Create ir_array_post data\n %s \n len=%ld   END\n",out,strlen(out));
 
   curl = curl_easy_init();
@@ -282,15 +356,15 @@ int http_igreent_post(char *data) {
     curl_exec_ir_gateway();
     return 1;
   }
-  printf("POST sensor data\n");
+  logd(igreent_debug,"POST sensor data\n");
   sensor_data = data;
   switch (data_format) {
     case HTTP_POST_FULL_DATA:    
-      printf("Full data\n");
+      logd(igreent_debug,"Full data\n");
       full_data_post(); 
       break;
     case HTTP_POST_SIMPLE_DATA:
-      printf("Simple data\n");
+      logd(igreent_debug,"Simple data\n");
       simple_data_post();
       break;
     default:
