@@ -8,7 +8,7 @@ from tkinter import messagebox
 def apply_settings():
     apply_button.focus_set()
     #save_button.grid(sticky=tk.S)
-    save_button.grid(row=6,column=1)
+    save_button.grid(row=9,column=1)
 
 def download_start():
     ser = serial.Serial(eth.com_port,115200)
