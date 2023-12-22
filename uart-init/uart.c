@@ -34,7 +34,10 @@ int get_ip() {
     int sockfd;
     struct ifreq ifr;
     struct sockaddr_in *sin;
-
+//	if (ipaddr[0]) {
+//		printf("Found IP : %s\n",ipaddr);
+//		return 0;
+//	}
     // 創建 socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("Socket creation error");
@@ -158,6 +161,7 @@ int main() {
 
     // 将要发送的数据
 	while (1) { // send mac
+		get_ip();
 		switch (state) {
 		case CONNECTION_INIT:
 			err = serial_init(1);
