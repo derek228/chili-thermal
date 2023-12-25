@@ -14,6 +14,7 @@
 #define IGREENT_POST_FRAME_URL "http://demo.igreent.com/php/insert_ir_arrary_post.php"
 #define IGREENT_IR_GATEWAY_URL "http://demo.igreent.com/php/exec_q_ir_gateway.php?macno=25:17:51:47:00:01"
 #define POST_SENSOR_DATA_URL "http://demo.igreent.com/php/insert_ir_arrary_post.php"
+#define POST_SENSOR_0101_DATA_URL "http://demo.igreent.com/php/insert_ir_arrary_post_0101.php"
 //#define IGREENT_IR_GATEWAY_URL "http://demo.igreent.com/php/exec_q_ir_gateway.php?macno=25:17:51:47:00:01"
 //#define IGREENT_IR_GATEWAY_URL "http://demo.igreent.com/php/exec_q_ir_gateway.php?macno=25:17:51:47:00:02"
 #define SENSOR_ID_LEN	20
@@ -306,7 +307,7 @@ static int simple_data_post() {
 
   curl = curl_easy_init();
   if(curl) {
-    curl_easy_setopt(curl, CURLOPT_URL, POST_SENSOR_DATA_URL);
+    curl_easy_setopt(curl, CURLOPT_URL, POST_SENSOR_0101_DATA_URL);
     headers = curl_slist_append(headers, "Expect:");
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
