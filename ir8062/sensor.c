@@ -19,7 +19,8 @@
 #include "cloud-service.h"
 #include "ini-parse.h"
 #include "sensor.h"
-
+#include "../leds/pwm_message.h"
+#include "led_control.h"
 // Thermal sensor hardware signal setting
 #define CAP_SIG_ID          0x0a 
 #define CMD_SIG_TASK_REG    _IOW(CAP_SIG_ID, 0, int32_t*)
@@ -420,6 +421,7 @@ int sensor_init(int argc, char *argv[])
 		fflush(0);
 		if (state_change == 1) 
 		{
+			led_send_msg(MSG_HEART_BIT);
 			//printf("===== spi read start\n");
 			//system("./i2cdump -f -y 1 0x40");
 			state_change = 0;

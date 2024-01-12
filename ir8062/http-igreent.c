@@ -10,6 +10,8 @@
 #include "ini-parse.h"
 #include "sensor.h"
 #include "rs485.h"
+#include "../leds/pwm_message.h"
+#include "led_control.h"
 
 #define IGREENT_POST_FRAME_URL "http://demo.igreent.com/php/insert_ir_arrary_post.php"
 #define IGREENT_IR_GATEWAY_URL "http://demo.igreent.com/php/exec_q_ir_gateway.php?macno=25:17:51:47:00:01"
@@ -152,7 +154,129 @@ int curl_exec_ir_gateway() {
     return 0;
   }
 }
-
+static void set_alarm_led(int level) {
+  static int lv1=0;
+  static int lv2=0;
+  
+  if ((level == 2) && (lv2==0) ){
+    printf("RED Blanking : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    led_send_msg(MSG_LEDY_DISABLE);
+    led_send_msg(MSG_LEDR_BLANKING);
+    lv2=1;
+    lv1=0;
+  }
+  else if ((level == 1) && (lv1==0) ){
+    printf("YELLOW Blanking : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    led_send_msg(MSG_LEDR_DISABLE);
+    led_send_msg(MSG_LEDY_BLANKING);
+    lv2=0;
+    lv1=1;
+  }
+  else if (level == 0) { // no alarm
+    if (lv1) {
+      printf("YELLOW OFF : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+      led_send_msg(MSG_LEDY_DISABLE);
+      lv1=0;
+    }
+    if (lv2) {
+      printf("RED OFF : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+      led_send_msg(MSG_LEDR_DISABLE);
+      lv2=0;
+    }
+  }
+}
+static int rs485_ack_pass(char *cmd) {
+  int len=0;
+  int retry=10;
+  char rx[8]={0};
+  while(retry) {
+    len = rs485_read(rx,8);
+    if ( (memcmp(rx,cmd,8)!=0) ) {
+      retry--;
+      usleep(10000);
+      //printf("rx=%s, len = %d\n", rx, len);
+    }
+    else break;
+  }
+  if (retry == 0) {
+    //printf("RS485 read ack error\n");
+    return 1; //fail
+  }
+  else {
+    printf("Get RS485 Command ACK, retry =%d\n",retry);
+    return 0; //pass
+  }
+}
+#if 1 
+static void set_alarm_dio(int level) {
+  static int lv1=0;
+  static int lv2=0;
+  printf("level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+  if ((level == 2) && ((lv2==0) || (lv1==0)) ){
+    printf("DO1/2 On : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    // send do1
+    if (lv1 == 0) {
+      rs485_send(RS485_DO1_ON,8);
+      if (rs485_ack_pass(RS485_DO1_ON)) 
+      {
+        printf("ERROR DO 1 off command fail\n");
+      }
+      else 
+        lv1 = 1 ; 
+    }
+    if (lv2==0) {
+      rs485_send(RS485_DO2_ON,8);
+      if (rs485_ack_pass(RS485_DO2_ON)) 
+      {
+        printf("ERROR DO 2 on command fail\n");
+      }
+      else 
+        lv2 = 1;
+    }
+  }
+  else if ((level == 1) && (lv1==0) ){
+    printf("DO1 On/DO2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    if (lv2==1) {
+      rs485_send(RS485_DO2_OFF,8);
+      if (rs485_ack_pass(RS485_DO2_OFF)) 
+      {
+        printf("ERROR DO 2 off command fail\n");
+      }
+      else 
+        lv2=0;
+    }
+    rs485_send(RS485_DO1_ON,8);
+    if (rs485_ack_pass(RS485_DO1_ON)) 
+    {
+      printf("ERROR DO 1 on command fail\n");
+    }
+    else 
+      lv1=1;
+  }
+  else if (level == 0) { // no alarm
+    printf("DO1/2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    if (lv1) {
+      rs485_send(RS485_DO1_OFF,8);
+      if (rs485_ack_pass(RS485_DO1_OFF)) 
+      {
+        printf("ERROR DO 1 off command fail\n");
+      }
+      else 
+        lv1=0;
+    }
+    if (lv2) {
+      rs485_send(RS485_DO2_OFF,8);
+      if (rs485_ack_pass(RS485_DO2_OFF)) 
+      {
+        printf("ERROR DO 2 off command fail\n");
+      }
+      else 
+        lv2=0;
+    }
+  }
+  printf("Exit : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+}
+#else
 static void set_alarm_dio(int index, int en) {
   static int alarm_do1=0, alarm_do2=0;
   int len=0;
@@ -161,10 +285,12 @@ static void set_alarm_dio(int index, int en) {
     if (en && (alarm_do1==0)) {
       printf("Send DO 1 On\n");
       rs485_send(RS485_DO1_ON,8);
+      led_send_msg(MSG_LEDY_BLANKING);
+      usleep(10000);
       len  = rs485_read(rx,8);
       if ((len !=8 ) || (memcmp(rx,RS485_DO1_ON,8)!=0))
       {
-        printf("ERROR DO 1 on command fail\nlen = %d, data = %s",len, rx);
+        printf("ERROR DO 1 on command fail\nlen = %d, data = %s\n",len, rx);
       }
       else
         alarm_do1 = 1;
@@ -172,10 +298,12 @@ static void set_alarm_dio(int index, int en) {
     else if ( (en==0) && alarm_do1) { // off
       printf("Send DO 1 Off\n");
       rs485_send(RS485_DO1_OFF,8);
+      led_send_msg(MSG_LEDY_DISABLE);
+      usleep(10000);
       len  = rs485_read(rx,8);
       if ((len !=8 ) || (memcmp(rx,RS485_DO1_OFF,8)!=0))
       {
-        printf("ERROR DO 1 on command fail\nlen = %d, data = %s",len, rx);
+        printf("ERROR DO 1 off command fail\nlen = %d, data = %s",len, rx);
       }
       else 
         alarm_do1=0;
@@ -185,6 +313,8 @@ static void set_alarm_dio(int index, int en) {
     if (en && (alarm_do2==0)) {
       printf("Send DO 2 On\n");
       rs485_send(RS485_DO2_ON,8);
+      led_send_msg(MSG_LEDR_BLANKING);
+      usleep(10000);
       len  = rs485_read(rx,8);
       if ((len !=8 ) || (memcmp(rx,RS485_DO2_ON,8)!=0) )
       {
@@ -196,6 +326,9 @@ static void set_alarm_dio(int index, int en) {
     else if ( (en==0) && alarm_do2) { // off
       printf("Send DO 2 Off\n");
       rs485_send(RS485_DO2_OFF,8);
+      led_send_msg(MSG_LEDR_DISABLE);
+      alarm_do1=0; // make sure yellow will be send again      
+      usleep(10000);
       len  = rs485_read(rx,8);
       if ((len !=8 ) || (memcmp(rx,RS485_DO2_OFF,8)!=0))
       {
@@ -206,6 +339,7 @@ static void set_alarm_dio(int index, int en) {
     }
   }
 }
+#endif
 static void convert_raw_to_string()
 {
   int i;
@@ -235,7 +369,7 @@ static int full_data_post(){
   convert_raw_to_string();
 	cjson_ir_array = cJSON_CreateObject();
 	cJSON_AddStringToObject(cjson_ir_array, "sensor_id", SensorID);
-	cJSON_AddStringToObject(cjson_ir_array, "modbus_cmd","IG8062_80X62");
+	cJSON_AddStringToObject(cjson_ir_array, "modbus_cmd","IG8062");
 	cJSON_AddStringToObject(cjson_ir_array, "ir_value",thermal_data_string);
 	out = cJSON_Print(cjson_ir_array);
 	//printf("Create ir_array_post data\n %s \n len=%ld   END\n",out,strlen(out));
@@ -277,7 +411,22 @@ static int simple_data_post() {
   unsigned int temp=(max_temp[0]<<8) | max_temp[1];
   char rs485_test_cmd[32]={0};//"Normal Temperature";
   logd(igreent_debug,"Max temperature = %d\n",temp);
-  printf("max = %d,alarm 1 temp = %d, alarm 2 temp = %d\n",temp, get_eth_over_temperature(),get_eth_alert_temerature());
+  printf("temperature=%d, max = %d,alarm 1 temp = %d, alarm 2 temp = %d\n",(temp-2735)/10, temp, get_eth_over_temperature(),get_eth_alert_temerature());
+  #if 1 
+  if ( temp > get_eth_alert_temerature() ) { // alarm level2
+    set_alarm_dio(2);
+    set_alarm_led(2);
+  }
+  else if (temp > get_eth_over_temperature() ) { // alarm level 1
+    set_alarm_dio(1);
+    set_alarm_led(1);
+  }
+  else {  // normal temperature
+    set_alarm_dio(0);
+    set_alarm_led(0);
+    return 0;
+  }
+  #else
   if (get_eth_over_temperature() > temp) {
     printf("Normal temperature, %d\n", (temp-2735)/10);
     //sprintf(rs485_test_cmd,"Normal Temperature %d\n",temp-2735);
@@ -295,6 +444,7 @@ static int simple_data_post() {
   else {
     set_alarm_dio(2,1);
   }
+#endif
   sprintf(max_temp_str, "%02X,%02X", max_temp[0],max_temp[1]);
   logd(igreent_debug,"MAX Temperature = %s\n", max_temp_str);
   cjson_ir_array = cJSON_CreateObject();

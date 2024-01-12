@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include "ini-parse.h"
 #include "dummy_temperature.h"
+#include "led_control.h"
+
 #define CUSTOM_INI_FILENAME "/mnt/mtdblock1/ir8062.ini"
 #define DEFAULT_INI_FILENAME "ir8062.ini"
 
@@ -52,7 +54,7 @@ int main(int argc, char *argv[]) {
 	pthread_t tid_sensor;
 	if (ir8062_config_init())
 		return -1;
-
+	
 	switch (ir8062_get_connectivity()) {
 		case CONNECTION_RJ45:
 			printf("Thermal sensor output data to RJ45\n");
@@ -64,6 +66,12 @@ int main(int argc, char *argv[]) {
 				}
 				else 
 					break;
+			}
+			if (cnt>=10) {
+				printf("ERROR : DHCP failed...\n");
+			}
+			else {
+				led_msg_init();
 			}
 			// initial cloud service here
 			if (ir8062_cloud_service_init(argc,argv)) {

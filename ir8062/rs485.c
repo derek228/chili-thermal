@@ -82,6 +82,7 @@ static int open_port(const char *portname)
 #endif	
 	//printf("opening serial port:%s\n",portname);
 	/*open serial port */
+	//if ((portfd=open(portname, O_RDWR | O_NOCTTY | O_NONBLOCK)) < 0) // 以读写方式打开串口设备
 	if((portfd=open(portname,O_RDWR | O_NOCTTY, 0)) < 0 )
 	{
    		printf("open serial port %s fail \n ",portname);
@@ -98,7 +99,8 @@ static int open_port(const char *portname)
 	newtios.c_iflag |=IGNPAR; /*ignore parity on input */
 	newtios.c_oflag &= ~(OPOST | ONLCR | OLCUC | OCRNL | ONOCR | ONLRET | OFILL); 
 	newtios.c_cflag = CS8 | CLOCAL | CREAD;
-	newtios.c_cc[VMIN]=1; /* block until 1 char received */
+	//newtios.c_cc[VMIN]=1; /* block until 1 char received */
+	newtios.c_cc[VMIN]=0; /* block until 1 char received */
 	newtios.c_cc[VTIME]=0; /*no inter-character timer */
 	/* 115200 bps */
 	cfsetospeed(&newtios,B9600);
