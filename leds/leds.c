@@ -38,9 +38,13 @@
 #define PWM_PREFIX	"/sys/class/pwm/pwmchip"
 #define GPIO_PREFIX	"/sys/class/gpio/"
 
-#define DEFALUT_BREATHING_CYCLE	5 // 5sec
+#define DEFALUT_BREATHING_CYCLE	3 // 5sec
+// active low
 #define DUTY_BREATHING_MAX	99// 80
 #define DUTY_BREATHING_MIN	50 // 30
+// active high
+//#define DUTY_BREATHING_MAX	50//99// 80
+//#define DUTY_BREATHING_MIN	0//50 // 30
 #define PWM_FREQ	5000 // 5 kHz
 
 #define PWM_POLARITY	1 // normal
@@ -84,7 +88,7 @@ static int heartbit_alarm = 0;
 static int heartbit_cnt=0;
 
 static unsigned int led_config_table[LED_NUMS] = {GPIO_LED_TYPE | INVERSE_ENABLE | LED_BLANKING_1S |GPIO_LED_R, 
-						GPIO_LED_TYPE | LED_BLANKING_2S | GPIO_LED_G, 
+						GPIO_LED_TYPE | INVERSE_ENABLE | LED_BLANKING_2S | GPIO_LED_G, 
 						GPIO_LED_TYPE | LED_BLANKING_1S | GPIO_LED_B, 
 						PWM_LED_TYPE | DEFAULT_LED_PWM_FREQ | PWM_LED_W};
 typedef struct {
