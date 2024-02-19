@@ -4,7 +4,7 @@
 // debug message
 #define logd(  dbg, x, y... ) do{ \
     if(dbg == 1 )\
-    printf( x"\r\n", ##y ); }while(0)
+    printf( x, ##y ); }while(0)
 
 
 #define FRAME_NUMBER 			10

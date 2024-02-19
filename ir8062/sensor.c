@@ -268,8 +268,9 @@ static int ir8062_hwinit()
 		tx[i] = 0;//i;
 		//printf("%x ", tx[i] );
 	}
-
-
+	printf("Reset MI48 \n");
+	system("./i2cset -f -y 1 0x40 0 1");
+	printf("MI48 reset done\n");
 	system("./i2cset -f -y 1 0x40 0xB4 0x03");
 	system("./i2cset -f -y 1 0x40 0xD0 0x02");
 	system("./i2cset -f -y 1 0x40 0xD0 0x03");
@@ -490,7 +491,9 @@ int sensor_init(int argc, char *argv[])
 			printf("INPUT Value = 0x%x, bytes=%d\n", key_val, inputbyte);
 			if (key_val == 0xa) {// enter
 				sleep(1);
+				printf ("exit ir8062 process\n");
 				//system("./i2cget -f -y 1 0x40 0xB6");
+				//system("./i2cset -f -y 1 0x40 0xB1 0");
 				break;
 			}
 		}
