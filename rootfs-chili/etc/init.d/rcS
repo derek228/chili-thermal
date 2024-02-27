@@ -45,8 +45,8 @@ fi
 
 #/thermal.sh
 /mnt/mtdblock1/thermal.sh
-#mkdir -p /var/log/lighttpd/
-#/usr/sbin/lighttpd start -f /usr/local/sbin/lighttpd.conf
+mkdir -p /var/log/lighttpd/
+/usr/sbin/lighttpd start -f /usr/local/sbin/lighttpd.conf
 
 
 

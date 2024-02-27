@@ -4,6 +4,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+
 #include "cJSON.h"
 #include "cloud-service.h"
 #include "http-igreent.h"
@@ -39,6 +41,16 @@ struct memory {
 };
 struct memory chunk = {0};
 char *sensor_data;
+static void igreent_log_print() {
+    const char *filename = "/mnt/mtdblock1/igreent";
+
+    // 检查文件是否存在
+    if (access(filename, F_OK) != -1) {
+        igreent_debug=1;
+    } else {
+        igreent_debug=0;
+    }
+}
 
 static int cJSONParserID(const char * const response) {
   cJSON *res = NULL;
@@ -160,6 +172,7 @@ static void set_alarm_led(int level) {
   
   if ((level == 2) && (lv2==0) ){
     printf("RED Blanking : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    led_send_msg(MSG_LEDW_DISABLE);
     led_send_msg(MSG_LEDY_DISABLE);
     led_send_msg(MSG_LEDR_BLANKING);
     lv2=1;
@@ -169,6 +182,7 @@ static void set_alarm_led(int level) {
     printf("YELLOW Blanking : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
     led_send_msg(MSG_LEDR_DISABLE);
     led_send_msg(MSG_LEDY_BLANKING);
+    led_send_msg(MSG_LEDW_DISABLE);
     lv2=0;
     lv1=1;
   }
@@ -177,11 +191,15 @@ static void set_alarm_led(int level) {
       printf("YELLOW OFF : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
       led_send_msg(MSG_LEDY_DISABLE);
       lv1=0;
+      if (lv2==0)
+        led_send_msg(MSG_LEDW_BREATHING);
     }
     if (lv2) {
       printf("RED OFF : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
       led_send_msg(MSG_LEDR_DISABLE);
       lv2=0;
+      if (lv1==0)
+        led_send_msg(MSG_LEDW_BREATHING);
     }
   }
 }
@@ -211,9 +229,9 @@ static int rs485_ack_pass(char *cmd) {
 static void set_alarm_dio(int level) {
   static int lv1=0;
   static int lv2=0;
-  printf("level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+  logd(igreent_debug,"level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
   if ((level == 2) && ((lv2==0) || (lv1==0)) ){
-    printf("DO1/2 On : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    logd(igreent_debug, "DO1/2 On : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
     // send do1
     if (lv1 == 0) {
       rs485_send(RS485_DO1_ON,8);
@@ -235,34 +253,40 @@ static void set_alarm_dio(int level) {
     }
   }
   else if ((level == 1) && (lv1==0) ){
-    printf("DO1 On/DO2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    logd(igreent_debug,"DO1 On/DO2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
     if (lv2==1) {
       rs485_send(RS485_DO2_OFF,8);
       if (rs485_ack_pass(RS485_DO2_OFF)) 
       {
         printf("ERROR DO 2 off command fail\n");
       }
-      else 
+      else {
         lv2=0;
+        printf("DO2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+      }
     }
     rs485_send(RS485_DO1_ON,8);
     if (rs485_ack_pass(RS485_DO1_ON)) 
     {
       printf("ERROR DO 1 on command fail\n");
     }
-    else 
+    else {
       lv1=1;
+      printf("DO1 On : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    }
   }
   else if (level == 0) { // no alarm
-    printf("DO1/2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+    logd(igreent_debug,"DO1/2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
     if (lv1) {
       rs485_send(RS485_DO1_OFF,8);
       if (rs485_ack_pass(RS485_DO1_OFF)) 
       {
         printf("ERROR DO 1 off command fail\n");
       }
-      else 
+      else {
         lv1=0;
+        printf("DO1 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+      }
     }
     if (lv2) {
       rs485_send(RS485_DO2_OFF,8);
@@ -270,11 +294,13 @@ static void set_alarm_dio(int level) {
       {
         printf("ERROR DO 2 off command fail\n");
       }
-      else 
+      else {
         lv2=0;
+        printf("DO2 Off : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+      }
     }
   }
-  printf("Exit : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
+  logd(igreent_debug,"Exit : level=%d, lv1=%d, lv2=%d\n",level, lv1,lv2);
 }
 #else
 static void set_alarm_dio(int index, int en) {
@@ -372,6 +398,7 @@ static int full_data_post(){
 	cJSON_AddStringToObject(cjson_ir_array, "modbus_cmd","IG8062");
 	cJSON_AddStringToObject(cjson_ir_array, "ir_value",thermal_data_string);
 	out = cJSON_Print(cjson_ir_array);
+  logd(igreent_debug, "%s\n",out);
 	//printf("Create ir_array_post data\n %s \n len=%ld   END\n",out,strlen(out));
 
   curl = curl_easy_init();
@@ -410,8 +437,8 @@ static int simple_data_post() {
   char *max_temp=get_full_frame_max_temperature();
   unsigned int temp=(max_temp[0]<<8) | max_temp[1];
   char rs485_test_cmd[32]={0};//"Normal Temperature";
-  logd(igreent_debug,"Max temperature = %d\n",temp);
-  printf("temperature=%d, max = %d,alarm 1 temp = %d, alarm 2 temp = %d\n",(temp-2735)/10, temp, get_eth_over_temperature(),get_eth_alert_temerature());
+  //logd(igreent_debug,"Max temperature = %d\n",temp);
+  logd(igreent_debug, "temperature=%d, max = %d,alarm 1 temp = %d, alarm 2 temp = %d\n",(temp-2735)/10, temp, get_eth_over_temperature(),get_eth_alert_temerature());
   #if 1 
   if ( temp > get_eth_alert_temerature() ) { // alarm level2
     set_alarm_dio(2);
@@ -501,6 +528,7 @@ static int igreent_register(){
 int http_igreent_post(char *data) {
   //int data_format=ir8062_get_post_data_format();
   int data_format = get_eth_data_format();
+  igreent_log_print();
   if (SensorID[0]==0) {
     printf("Registering MAC address to igreent cloud\n");
     igreent_register();

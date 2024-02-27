@@ -84,8 +84,24 @@
 #define LED_B_FREQ	1 //sec
 #define LED_Y_FREQ	1 //sec
 
+#define logd(  dbg, x, y... ) do{ \
+    if(dbg == 1 )\
+    printf( x, ##y ); }while(0)
+
 static int heartbit_alarm = 0;
 static int heartbit_cnt=0;
+static int leds_debug=0;
+
+static void leds_log_print() {
+    const char *filename = "/mnt/mtdblock1/ledlog";
+
+    // 检查文件是否存在
+    if (access(filename, F_OK) != -1) {
+        leds_debug=1;
+    } else {
+        leds_debug=0;
+    }
+}
 
 static unsigned int led_config_table[LED_NUMS] = {GPIO_LED_TYPE | INVERSE_ENABLE | LED_BLANKING_1S |GPIO_LED_R, 
 						GPIO_LED_TYPE | INVERSE_ENABLE | LED_BLANKING_2S | GPIO_LED_G, 
@@ -316,7 +332,7 @@ static void led_blanking() {
 		else if (led_t[i].led_blanking) {
 			led_t[i].duty++;
 			if (led_t[i].duty>=led_t[i].breath_delay) {
-				printf("LED%d toggle: count=%d, max=%d, delay=%d\n",i, led_t[i].duty, led_t[i].breath_delay, led_t[3].breath_delay);
+				logd(leds_debug,"LED%d toggle: count=%d, max=%d, delay=%d\n",i, led_t[i].duty, led_t[i].breath_delay, led_t[3].breath_delay);
 				led_t[i].duty = 0;
 				led_t[i].breath_en = !led_t[i].breath_en;
 				set_led_gpios(led_t[i].id, led_t[i].breath_en);
@@ -492,6 +508,7 @@ void *receiveMessage(void *arg) {
 	while (msg != MSG_EXIT) {
 		if (msgrcv(msgid, &msg_data, sizeof(msg_data.msg_text), 1, IPC_NOWAIT) == -1) {
 			if (errno == ENOMSG) {
+				leds_log_print();
 				//printf("No message in the queue\n");
 				breathing_lignt(LED_W);
 				led_blanking();

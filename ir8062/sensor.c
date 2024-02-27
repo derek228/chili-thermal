@@ -10,7 +10,7 @@
 #include <getopt.h>
 #include <linux/types.h>
 #include "spidev.h"
-
+#include <time.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <stdint.h>
@@ -21,6 +21,8 @@
 #include "sensor.h"
 #include "../leds/pwm_message.h"
 #include "led_control.h"
+#include "jpegenc.h"
+
 // Thermal sensor hardware signal setting
 #define CAP_SIG_ID          0x0a 
 #define CMD_SIG_TASK_REG    _IOW(CAP_SIG_ID, 0, int32_t*)
@@ -128,7 +130,16 @@ static void parse_opts(int argc, char *argv[])
 	}
 }
 #endif
+static void sensor_log_print() {
+    const char *filename = "/mnt/mtdblock1/sensor";
 
+    // 检查文件是否存在
+    if (access(filename, F_OK) != -1) {
+        sensor_debug=1;
+    } else {
+        sensor_debug=0;
+    }
+}
 void sig_event_handler(int sig_id, siginfo_t *sig_info, void *unused)
 {
 	if ( sig_id == CAP_SIG_ID ) {
@@ -402,6 +413,7 @@ int sensor_init(int argc, char *argv[])
 	int spi_count = 0;
 	int count_break = 0;
 	unsigned int index = 0;
+	unsigned int max_temp, min_temp, temp;
 	int i,ret = 0;
 	//-------remove front 80 byte--------
 	static uint16_t remove_front_count = 0;
@@ -416,16 +428,20 @@ int sensor_init(int argc, char *argv[])
 	}
 	fcntl(STDIN_FILENO,F_SETFL, key_flags | O_NONBLOCK);
 	ret=ir8062_hwinit();
-
+    clock_t start, end;
+    start = clock();
 	while(1) 
 	{
 		fflush(0);
+		sensor_log_print();
 		if (state_change == 1) 
 		{
 			led_send_msg(MSG_HEART_BIT);
 			//printf("===== spi read start\n");
 			//system("./i2cdump -f -y 1 0x40");
 			state_change = 0;
+			max_temp = 0;
+			min_temp = 0xffff;
 			for(spi_count = 0; spi_count<100; spi_count++)			//101 -> 80*62*2 / 99
 			{
 				transfer(fd_spi, tx, rx, size);
@@ -436,6 +452,13 @@ int sensor_init(int argc, char *argv[])
 						//printf("Remove header, start record tempature\n");
 						thermeal_image_1B_raw[index] = rx[i]; 
 						index = index +1 ;
+						if ((index>0) && (index%2==0)) {
+							temp = (thermeal_image_1B_raw[index-2]<<8) | thermeal_image_1B_raw[index-1];
+							if (max_temp < temp)
+								max_temp = temp;
+							if (min_temp > temp)
+								min_temp = temp;
+						}
 					}
 					else{
 						thermal_header_parse(i,rx);
@@ -474,6 +497,16 @@ int sensor_init(int argc, char *argv[])
 #else				
 					//printf("%s :DATA = %s, len=%ld\n",__FUNCTION__,thermeal_image_1B_raw,strlen(thermeal_image_1B_raw));
 					ir8062_send_data(thermeal_image_1B_raw);
+					unsigned int max=(full_frame_max_temperature[0]<<8) |full_frame_max_temperature[1];
+					unsigned int min=(full_frame_min_temperature[0]<<8)|full_frame_min_temperature[1];
+					logd(sensor_debug,"Max=%d, Min=%d\n", max_temp, min_temp);
+					//printf("Max=%d, Min=%d\n", max_temp, min_temp);
+					end = clock();
+					if ( (end-start)>500000) { // 500m sec
+						//printf("Elapsed time=%d\n",end-start);
+						jpegenc(thermeal_image_1B_raw,max,min);
+						start = end;
+					}
 #endif
 					//printf("OK : size=%ld Byte\n ",sizeof(thermeal_image_1B_raw) );
 					//show_thermal_raw(thermeal_image_1B_raw);

@@ -8,12 +8,13 @@
 
 #define CUSTOM_INI_FILENAME "/mnt/mtdblock1/ir8062.ini"
 #define DEFAULT_INI_FILENAME "ir8062.ini"
-
+#define FW_VERSION	"1.00.04"
 static char *ini_filename;
 static int ir8062_config_init()
 {
 	char *filename=NULL;
 	size_t len=0;
+	printf("FW Version : %s", FW_VERSION);
 	if (access(CUSTOM_INI_FILENAME,F_OK) != -1) {
 		filename=CUSTOM_INI_FILENAME;
 		len=strlen(filename);
